@@ -1,11 +1,10 @@
 #!/usr/bin/python3
 
-from bluepy.btle import Scanner, DefaultDelegate
-from bluepy import btle
-import binascii
+from bluepy.btle import Scanner, DefaultDelegate, Peripheral, UUID
 import time
 import os
 import sqlite3
+from datetime import datetime
 
 dev = None
 
@@ -17,7 +16,7 @@ def lf_flowerpot():
     for dev in devices:
         if dev.addr == '24:0a:c4:00:61:86':
             try:
-                dev = btle.Peripheral("24:0A:C4:00:61:86")
+                dev = Peripheral("24:0A:C4:00:61:86")
                 time.sleep(2)
                 return True
             except Exception as e:
@@ -26,16 +25,20 @@ def lf_flowerpot():
 
     time.sleep(20)
 
-def get_values(val):
+def get_values(val, sql=False):
     mp, si = val[0][1].decode('UTF-8').replace("(","").replace(")","").split(", ")
     hum = val[1][1].decode('UTF-8')
     red, blue = val[2][1].decode('UTF-8').replace("(","").replace(")","").split(", ")
     press = val[3][1].decode('UTF-8')
     voltage = val[4][1].decode('UTF-8')
     moist = val[5][1].decode('UTF-8')
-    print(mp, si, hum, red, blue, press, voltage, moist)
+    
+    if sql:
+        time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        return (mp, si, hum, red, blue, press, voltage, moist, time, 0)
+    return (mp, si, hum, red, blue, press, voltage, moist)
 
-time_s = 0
+time_s = 1
 while True:
     os.system('sudo hciconfig hci0 leadv 0')
     time.sleep(time_s)
@@ -47,7 +50,7 @@ while True:
     val = []
     try:
         print('Services...')
-        serv = dev.getServiceByUUID(uuidVal=btle.UUID(0x10e1))
+        serv = dev.getServiceByUUID(uuidVal=UUID(0x10e1))
         print('Characteristics...')
         char = serv.getCharacteristics()
         list_set = set(char) 
@@ -69,17 +72,16 @@ while True:
         continue
 
     val = sorted(val, key=lambda tup: tup[0].binVal)
-    get_values(val)
     if os.system('ping -q -I eth0 -w 1 -c 1 8.8.8.8 > /dev/null') == 0:
-        print('mqtt')
+        get_values(val)
     else:
         try:
-            conn = sqlite3.connect('flower_pot_data.db')
+            conn = sqlite3.connect('flower_pot_data.db', isolation_level=None)
             c = conn.cursor()
-            sql = ''' INSERT INTO measurements(temperature_mp, temperature_si, humidity, light_r, light_b, pressure, battery, moisture, datetime, global) VALUES (?,?,?,?,?,?,?,?,?) '''
-            # YYYY-MM-DD HH:MM:SS is datetime format fo sqlite
-            c.execute(sql, val)
-            con.close()
+            sql = ''' INSERT INTO measurements(temperature_mp, temperature_si, humidity, light_r, light_b, pressure, battery, moisture, datetime, global) VALUES (?,?,?,?,?,?,?,?,?,?) '''
+            c.execute(sql, get_values(val, sql=True))
+            conn.close()
+            print('SQL done, last row id is:', c.lastrowid)
         except sqlite3.Error as e:
             print(e)
 
