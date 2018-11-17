@@ -53,7 +53,16 @@ while True:
         list_set = set(char) 
         char = (list(list_set)) # convert the set to the list
         print('Read...')
-        val = [ (ch.uuid, ch.read()) for ch in char ]
+        val = []
+        respChar = None
+        for ch in char:
+            if ch.uuid.binVal[3] == 0xd7:
+                respChar = ch
+                continue
+            val.append((ch.uuid, ch.read()))
+        if (len(val) == 6):
+            print('Response...')
+            respChar.write(bytes(1), withResponse=False)
     except Exception as e:
         print(e)
         time_s = 0
