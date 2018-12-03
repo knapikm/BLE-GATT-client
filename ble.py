@@ -5,6 +5,7 @@ import time
 import os
 import sqlite3
 from datetime import datetime
+import paho.mqtt.client as mqtt
 
 dev = None
 
@@ -17,32 +18,35 @@ def lf_flowerpot():
         if dev.addr == '24:0a:c4:00:61:86':
             try:
                 dev = Peripheral("24:0A:C4:00:61:86")
-                time.sleep(2)
+                time.sleep(1)
                 return True
             except Exception as e:
                 print(e)
                 return False
 
-    time.sleep(20)
+    return None
 
 def get_values(val, sql=False):
-    mp, si = val[0][1].decode('UTF-8').replace("(","").replace(")","").split(", ")
-    hum = val[1][1].decode('UTF-8')
-    red, blue = val[2][1].decode('UTF-8').replace("(","").replace(")","").split(", ")
-    press = val[3][1].decode('UTF-8')
-    voltage = val[4][1].decode('UTF-8')
-    moist = val[5][1].decode('UTF-8')
+    id = val[0][1].decode('UTF-8')
+    mp, si = val[1][1].decode('UTF-8').replace("(","").replace(")","").split(", ")
+    hum = val[2][1].decode('UTF-8')
+    red, blue = val[3][1].decode('UTF-8').replace("(","").replace(")","").split(", ")
+    press = val[4][1].decode('UTF-8')
+    voltage = val[5][1].decode('UTF-8')
+    moist = val[6][1].decode('UTF-8')
     
     if sql:
-        time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        return (mp, si, hum, red, blue, press, voltage, moist, time, 0)
-    return (mp, si, hum, red, blue, press, voltage, moist)
+        return (id, si, hum, press, voltage, moist, 0)
+    return (id, si, hum, press, voltage, moist)
 
 time_s = 1
 while True:
     os.system('sudo hciconfig hci0 leadv 0')
     time.sleep(time_s)
     if lf_flowerpot() is False:
+        time_s = 2
+        continue
+    if lf_flowerpot() is None:
         time_s = 10
         continue
     print('Connected.')
@@ -63,12 +67,12 @@ while True:
                 respChar = ch
                 continue
             val.append((ch.uuid, ch.read()))
-        if (len(val) == 6):
+        if (len(val)) == 8:
             print('Response...')
             respChar.write(bytes(1), withResponse=False)
     except Exception as e:
         print(e)
-        time_s = 0
+        time_s = 2
         continue
 
     val = sorted(val, key=lambda tup: tup[0].binVal)
@@ -78,7 +82,7 @@ while True:
         try:
             conn = sqlite3.connect('flower_pot_data.db', isolation_level=None)
             c = conn.cursor()
-            sql = ''' INSERT INTO measurements(temperature_mp, temperature_si, humidity, light_r, light_b, pressure, battery, moisture, datetime, global) VALUES (?,?,?,?,?,?,?,?,?,?) '''
+            sql = ''' INSERT INTO measurements(id, temperature, humidity, pressure, battery, moisture, global) VALUES (?,?,?,?,?,?,?) '''
             c.execute(sql, get_values(val, sql=True))
             conn.close()
             print('SQL done, last row id is:', c.lastrowid)
