@@ -12,13 +12,14 @@ dev = None
 def lf_flowerpot():
     global dev
     scanner = Scanner()
+    print('scanning...')
     devices = scanner.scan(5.0)
     finded = False
     for dev in devices:
         if dev.addr == '24:0a:c4:00:61:86':
             try:
+                print('connecting...')
                 dev = Peripheral("24:0A:C4:00:61:86")
-                time.sleep(1)
                 return True
             except Exception as e:
                 print(e)
@@ -27,26 +28,24 @@ def lf_flowerpot():
     return None
 
 def get_values(val, sql=False):
-    id = val[0][1].decode('UTF-8')
-    mp, si = val[1][1].decode('UTF-8').replace("(","").replace(")","").split(", ")
-    hum = val[2][1].decode('UTF-8')
-    red, blue = val[3][1].decode('UTF-8').replace("(","").replace(")","").split(", ")
-    press = val[4][1].decode('UTF-8')
-    voltage = val[5][1].decode('UTF-8')
-    moist = val[6][1].decode('UTF-8')
+    #resp = val[0][1].decode('UTF-8')
+    id, temp = val[0][1].decode('UTF-8').split(", ")
+    hum, press = val[1][1].decode('UTF-8').split(", ")
+    voltage, moist = val[2][1].decode('UTF-8').split(", ")
     
     if sql:
-        return (id, si, hum, press, voltage, moist, 0)
-    return (id, si, hum, press, voltage, moist)
+        return (id, temp, hum, press, voltage, moist, 0)
+    return (id, temp, hum, press, voltage, moist)
 
 time_s = 1
 while True:
     os.system('sudo hciconfig hci0 leadv 0')
     time.sleep(time_s)
-    if lf_flowerpot() is False:
+    lf = lf_flowerpot()
+    if lf is False:
         time_s = 2
         continue
-    if lf_flowerpot() is None:
+    if lf is None:
         time_s = 10
         continue
     print('Connected.')
@@ -63,11 +62,11 @@ while True:
         val = []
         respChar = None
         for ch in char:
-            if ch.uuid.binVal[3] == 0xd7:
+            if ch.uuid.binVal[3] == 0xd0:
                 respChar = ch
                 continue
             val.append((ch.uuid, ch.read()))
-        if (len(val)) == 8:
+        if (len(val)) == 4:
             print('Response...')
             respChar.write(bytes(1), withResponse=False)
     except Exception as e:
