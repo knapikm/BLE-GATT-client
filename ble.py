@@ -12,13 +12,11 @@ dev = None
 def lf_flowerpot():
     global dev
     scanner = Scanner()
-    print('scanning...')
     devices = scanner.scan(5.0)
     finded = False
     for dev in devices:
         if dev.addr == '24:0a:c4:00:61:86':
             try:
-                print('connecting...')
                 dev = Peripheral("24:0A:C4:00:61:86")
                 return True
             except Exception as e:
@@ -30,9 +28,10 @@ def lf_flowerpot():
 def get_values(val, sql=False):
     #resp = val[0][1].decode('UTF-8')
     id, temp = val[0][1].decode('UTF-8').split(", ")
-    hum, press = val[1][1].decode('UTF-8').split(", ")
-    voltage, moist = val[2][1].decode('UTF-8').split(", ")
-    
+    #hum, press = val[1][1].decode('UTF-8').split(", ")
+    hum, press = 0,0
+    voltage, moist = val[1][1].decode('UTF-8').split(", ")
+    print(id, temp, hum, press, voltage, moist)
     if sql:
         return (id, temp, hum, press, voltage, moist, 0)
     return (id, temp, hum, press, voltage, moist)
@@ -66,7 +65,7 @@ while True:
                 respChar = ch
                 continue
             val.append((ch.uuid, ch.read()))
-        if (len(val)) == 4:
+        if (len(val)) == 2:
             print('Response...')
             respChar.write(bytes(1), withResponse=False)
     except Exception as e:
